@@ -35,6 +35,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.webkit.MimeTypeMap;
 
 import io.github.pwlin.cordova.plugins.fileopener2.FileProvider;
@@ -45,6 +46,8 @@ import org.apache.cordova.PluginResult;
 import org.apache.cordova.CordovaResourceApi;
 
 public class FileOpener2 extends CordovaPlugin {
+	private static final int OPEN_FILE_REQUEST = 1;
+	private CallbackContext callback;
 
 	/**
 	 * Executes the request and returns a boolean.
@@ -91,7 +94,15 @@ public class FileOpener2 extends CordovaPlugin {
 		return true;
 	}
 
+	public Bundle onSaveInstanceState() {
+		Bundle state = new Bundle();
+		state.putString("restoredFileOpener", "restoredForActivityResult");
+		return state;
+	}
+
 	private void _open(String fileArg, String contentType, Boolean openWithDefault, CallbackContext callbackContext) throws JSONException {
+		this.callback = callbackContext;
+
 		String fileName = "";
 		try {
 			CordovaResourceApi resourceApi = webView.getResourceApi();
@@ -116,7 +127,7 @@ public class FileOpener2 extends CordovaPlugin {
 						path = Uri.fromFile(file);
 					} else {
 						Context context = cordova.getActivity().getApplicationContext();
-						path = FileProvider.getUriForFile(context, cordova.getActivity().getPackageName() + ".fileOpener2.provider", file);
+						path = FileProvider.getUriForFile(context, cordova.getActivity().getPackageName() + ".opener.provider", file);
 					}
 					intent.setDataAndType(path, contentType);
 					intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -124,9 +135,9 @@ public class FileOpener2 extends CordovaPlugin {
 				} else {
 					intent = new Intent(Intent.ACTION_VIEW);
 					Context context = cordova.getActivity().getApplicationContext();
-					Uri path = FileProvider.getUriForFile(context, cordova.getActivity().getPackageName() + ".fileOpener2.provider", file);
+					Uri path = FileProvider.getUriForFile(context, cordova.getActivity().getPackageName() + ".opener.provider", file);
 					intent.setDataAndType(path, contentType);
-					intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+					intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_ACTIVITY_NO_HISTORY);
 
 				}
 
@@ -135,10 +146,12 @@ public class FileOpener2 extends CordovaPlugin {
 				 * http://stackoverflow.com/questions/14321376/open-an-activity-from-a-cordovaplugin
 				 */
 				 if(openWithDefault){
-					 cordova.getActivity().startActivity(intent);
+//					 cordova.getActivity().startActivity(intent);
+					 cordova.startActivityForResult(this, intent, FileOpener2.OPEN_FILE_REQUEST);
 				 }
 				 else{
-					 cordova.getActivity().startActivity(Intent.createChooser(intent, "Open File in..."));
+//					 cordova.getActivity().startActivity(Intent.createChooser(intent, "Open File in..."));
+					 cordova.startActivityForResult(this, Intent.createChooser(intent, "Open File in..."), FileOpener2.OPEN_FILE_REQUEST);
 				 }
 
 				callbackContext.success();
@@ -195,5 +208,18 @@ public class FileOpener2 extends CordovaPlugin {
         return appInstalled;
 	}
 
+	@Override
+	public void onRestoreStateForActivityResult(Bundle state, CallbackContext callbackContext) {
+		System.out.println("fileopener onRestoreStateForActivityResult");
+		this.callback = callbackContext;
+	}
+
+	@Override
+	public void onActivityResult (int requestCode, int resultCode, Intent data) {
+		System.out.println("fileopener onActivityResult");
+		if(this.callback != null) {
+			this.callback.success("File opener terminated");
+		}
+	}
 }
 
